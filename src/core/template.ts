@@ -31,7 +31,17 @@ const SOURCE_FIELDS: Record<WakeEvent["source"], readonly string[]> = {
   gmail: ["label", "from", "to", "subject", "date"],
   // ts/threadTs are identifiers, not content — the wake-then-fetch pattern
   // passes them so the agent can fetch the message/thread via its own tools.
-  slack: ["channel", "channelName", "user", "userName", "eventType", "team", "ts", "threadTs"],
+  slack: [
+    "channel",
+    "channelName",
+    "user",
+    "userName",
+    "eventType",
+    "team",
+    "ts",
+    "threadTs",
+    "sourceId",
+  ],
   // Generic webhooks: the user-authored field mapping IS the whitelist, so
   // every scalar in the (already-trimmed) payload is a template field.
   webhook: ["provider"],

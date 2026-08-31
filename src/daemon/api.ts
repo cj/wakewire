@@ -11,11 +11,14 @@ import { secretNames } from "../secrets/store.js";
 import type { AgentAdapter } from "../sinks/types.js";
 import { createSmeeChannel, GithubWebhookSource } from "../sources/github/source.js";
 import { GmailSourceConfigSchema } from "../sources/gmail/source.js";
+import { postSlackMessage, SlackPostError } from "../sources/slack/post.js";
 import { WebhookMappingSchema } from "../sources/webhook/map.js";
 import { WebhookIngestSource } from "../sources/webhook/source.js";
 import { WebhookVerificationSchema } from "../sources/webhook/verify.js";
 import { VERSION } from "../version.js";
 import type { SourceManager } from "./sources.js";
+
+export type SlackPoster = typeof postSlackMessage;
 
 export interface ApiContext {
   stores: Stores;
@@ -26,6 +29,8 @@ export interface ApiContext {
   config: DaemonConfig;
   logger: Logger;
   startedAt: string;
+  /** Test seam; production uses postSlackMessage + WebClient. */
+  slackPoster?: SlackPoster | undefined;
 }
 
 /**
@@ -390,7 +395,7 @@ export function createApi(ctx: ApiContext): Hono {
           "Slack connects over Socket Mode (an outbound WebSocket) — no public URL needed. One-time app setup:",
           "1. Create a Slack app at https://api.slack.com/apps → 'Create New App' → 'From scratch', in your workspace.",
           "2. Settings → Socket Mode: enable it. Generate the app-level token with the connections:write scope (starts with xapp-).",
-          "3. Features → OAuth & Permissions → Bot Token Scopes: add app_mentions:read, channels:history, channels:read, users:read (add groups:history/groups:read too for private channels).",
+          "3. Features → OAuth & Permissions → Bot Token Scopes: add app_mentions:read, channels:history, channels:read, users:read, chat:write (add groups:history/groups:read too for private channels; add chat:write.public to post in public channels the bot has not joined).",
           "4. Features → Event Subscriptions: enable, and under 'Subscribe to bot events' add app_mention and message.channels (and message.groups for private channels).",
           "5. Install the app to the workspace (OAuth & Permissions → Install) and copy the Bot User OAuth Token (starts with xoxb-).",
           `6. In a terminal run: wakewire auth slack --source ${record.id}  — it prompts for both tokens (hidden input).`,
@@ -428,6 +433,53 @@ export function createApi(ctx: ApiContext): Hono {
     }
     ctx.stores.captures.removeForSource(id);
     return c.json({ ok: true });
+  });
+
+  // --- slack outbound (loopback production path; bot token stays on this machine) ---
+
+  app.post("/api/slack/post", async (c) => {
+    const body = await c.req.json().catch(() => null);
+    const parsed = z
+      .object({
+        sourceId: z.string().min(1),
+        channel: z.string().min(1),
+        text: z.string().min(1),
+        thread_ts: z.string().min(1).optional(),
+      })
+      .safeParse(body);
+    if (!parsed.success) {
+      return c.json({ error: "invalid body", issues: parsed.error.issues }, 400);
+    }
+    const source = ctx.stores.sources.get(parsed.data.sourceId);
+    if (source?.kind !== "slack") {
+      return c.json({ error: "slack source not found" }, 404);
+    }
+    const botToken = ctx.secrets.get(secretNames.slackBotToken(source.id));
+    if (!botToken) {
+      return c.json(
+        { error: `no Slack bot token stored for source ${source.id} — run: wakewire auth slack` },
+        400,
+      );
+    }
+    const poster = ctx.slackPoster ?? postSlackMessage;
+    try {
+      const result = await poster({
+        botToken,
+        channel: parsed.data.channel,
+        text: parsed.data.text,
+        ...(parsed.data.thread_ts ? { threadTs: parsed.data.thread_ts } : {}),
+      });
+      ctx.logger.info(
+        { source: source.id, channel: result.channel, ts: result.ts },
+        "slack message posted",
+      );
+      return c.json({ ok: true, channel: result.channel, ts: result.ts });
+    } catch (err) {
+      const message =
+        err instanceof SlackPostError || err instanceof Error ? err.message : String(err);
+      ctx.logger.warn({ source: source.id, err: message }, "slack post failed");
+      return c.json({ error: message }, 502);
+    }
   });
 
   // --- test injection (M1 demo + smoke tests) ---

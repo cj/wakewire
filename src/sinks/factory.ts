@@ -1,12 +1,28 @@
 import type { DaemonConfig } from "../config.js";
 import type { Logger } from "../logging.js";
+import type { SecretStore } from "../secrets/store.js";
 import { CodexAppServerAdapter } from "./codex-app-server.js";
 import { CodexExecAdapter } from "./codex-exec.js";
 import { CodexSdkAdapter } from "./codex-sdk.js";
+import { GrokBotAdapter, hasConfiguredGrokBotAgent, lookupGrokBotAgent } from "./grok-bot.js";
 import type { AgentAdapter } from "./types.js";
 
-export function createAdapter(config: DaemonConfig, logger: Logger): AgentAdapter {
+export function createAdapter(
+  config: DaemonConfig,
+  logger: Logger,
+  secrets: SecretStore,
+): AgentAdapter {
   switch (config.adapter) {
+    case "grok-bot":
+      return new GrokBotAdapter(logger, {
+        lookupAgent: (threadId) => lookupGrokBotAgent(secrets, threadId),
+        defaultAgentId: config.grokBotDefaultAgent,
+        hasConfiguredAgent: () =>
+          hasConfiguredGrokBotAgent(secrets) ||
+          (config.grokBotDefaultAgent
+            ? lookupGrokBotAgent(secrets, config.grokBotDefaultAgent) !== null
+            : false),
+      });
     case "codex-app-server":
       return new CodexAppServerAdapter(logger, {
         codexPath: config.codexPath,

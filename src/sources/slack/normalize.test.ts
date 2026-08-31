@@ -16,6 +16,7 @@ describe("slackToWakeEvent", () => {
       eventId: "Ev123",
       teamId: "T789",
       names: { channelName: "dev", userName: "glenn" },
+      sourceId: "slack-default",
     });
     expect(event).toMatchObject({
       source: "slack",
@@ -25,12 +26,15 @@ describe("slackToWakeEvent", () => {
     });
     expect(event?.summary).toContain("@glenn mentioned the bot in #dev");
     expect(event?.payload).toMatchObject({
+      sourceId: "slack-default",
       channel: "C456",
       channelName: "dev",
       user: "U123",
       userName: "glenn",
       team: "T789",
       eventType: "app_mention",
+      ts: "1751551200.000100",
+      threadTs: "1751551200.000100",
     });
     expect(JSON.stringify(event?.payload)).not.toContain("should-not-leak");
     expect(JSON.stringify(event?.payload)).not.toContain("rich_text");
@@ -42,18 +46,22 @@ describe("slackToWakeEvent", () => {
       eventId: "Ev1",
       teamId: undefined,
       names: {},
+      sourceId: "slack-default",
     });
     expect(plain?.kind).toBe("message");
     expect(plain?.summary).toContain("@U1");
     // unresolved names fall back to raw ids so the default template always renders
     expect(plain?.payload.channelName).toBe("C1");
     expect(plain?.payload.userName).toBe("U1");
+    expect(plain?.payload.sourceId).toBe("slack-default");
+    expect(plain?.payload.threadTs).toBe("1.0");
 
     const subtype = slackToWakeEvent({
       event: { type: "message", subtype: "channel_topic", channel: "C1", ts: "1.0" },
       eventId: "Ev2",
       teamId: "T1",
       names: {},
+      sourceId: "slack-default",
     });
     expect(subtype?.kind).toBe("message.channel_topic");
   });
@@ -64,6 +72,7 @@ describe("slackToWakeEvent", () => {
       eventId: "Ev3",
       teamId: undefined,
       names: {},
+      sourceId: "slack-default",
     });
     const text = event?.payload.text as string;
     expect(text.length).toBeLessThanOrEqual(4000 + "… [truncated]".length);
@@ -82,15 +91,28 @@ describe("slackToWakeEvent", () => {
       eventId: "Ev4",
       teamId: undefined,
       names: { userName: "sam" },
+      sourceId: "slack-default",
     });
     expect(event?.kind).toBe("reaction_added");
     expect(event?.summary).toBe("@sam reacted :rocket: in #C9");
-    expect(event?.payload).toMatchObject({ channel: "C9", reaction: "rocket", itemTs: "2.0" });
+    expect(event?.payload).toMatchObject({
+      sourceId: "slack-default",
+      channel: "C9",
+      reaction: "rocket",
+      itemTs: "2.0",
+      threadTs: "2.0",
+    });
   });
 
   it("returns null for typeless events", () => {
     expect(
-      slackToWakeEvent({ event: {}, eventId: "Ev5", teamId: undefined, names: {} }),
+      slackToWakeEvent({
+        event: {},
+        eventId: "Ev5",
+        teamId: undefined,
+        names: {},
+        sourceId: "slack-default",
+      }),
     ).toBeNull();
   });
 });

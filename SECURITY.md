@@ -110,6 +110,11 @@ enabling `workspace-write` on anything.
   display name exactly (case-insensitive). Display names are mutable and can
   collide, so name-based `fromUser` is a convenience filter, **not** an
   authorization boundary — use a user id when it needs to be one.
+- Outbound Slack posting is a localhost API (`POST /api/slack/post`) authenticated
+  with the daemon bearer in `~/.wakewire/daemon.json`. The bot token is read from
+  the secret store on this machine and used with `chat.postMessage`; it is never
+  placed in a wake, a smee URL, or any public ingress. There is no
+  `/ingress/slack-reply`. Socket Mode remains inbound-only.
 
 ## Blast-radius defaults
 

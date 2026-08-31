@@ -29,8 +29,9 @@ interface SlackEnvelope {
 /**
  * Slack source over Socket Mode: an outbound WebSocket authenticated with an
  * app-level token (xapp-…), so — like the smee relay for GitHub — no public
- * HTTP endpoint is needed. The bot token (xoxb-…) is only used to resolve
- * channel/user names for summaries and match rules.
+ * HTTP endpoint is needed. The bot token (xoxb-…) resolves channel/user names
+ * and posts replies via loopback POST /api/slack/post (chat.postMessage).
+ * Socket Mode stays inbound-only; there is no reply-smee or /ingress/slack-reply.
  *
  * Deliverable events are acked only after they are durably enqueued (see
  * handleEnvelope); un-acked envelopes are redelivered by Slack with the same
@@ -158,6 +159,7 @@ export class SlackSocketSource implements Source {
       eventId,
       teamId: envelope.body.team_id,
       names,
+      sourceId: this.id,
     });
     if (!wakeEvent) {
       await envelope.ack();

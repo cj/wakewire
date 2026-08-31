@@ -14,6 +14,7 @@ export { Daemon, runDaemon } from "./daemon/daemon.js";
 export { CodexAppServerAdapter } from "./sinks/codex-app-server.js";
 export { CodexExecAdapter } from "./sinks/codex-exec.js";
 export { CodexSdkAdapter } from "./sinks/codex-sdk.js";
+export { GrokBotAdapter } from "./sinks/grok-bot.js";
 export {
   type AgentAdapter,
   BusyError,
