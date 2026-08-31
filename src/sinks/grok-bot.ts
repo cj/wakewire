@@ -73,6 +73,11 @@ export class GrokBotAdapter implements AgentAdapter {
     agent: GrokBotCredentials,
     prompt: string,
   ): Promise<void> {
+    if (!agent.webhookUrl.startsWith("https:")) {
+      throw new PermanentError(
+        `grok-bot webhook for specialist "${threadId}" must be an https URL`,
+      );
+    }
     const fetchImpl = this.config.fetch ?? fetch;
     const timeoutMs = this.config.timeoutMs ?? GROK_BOT_WAKE_TIMEOUT_MS;
     const ac = new AbortController();
@@ -87,6 +92,7 @@ export class GrokBotAdapter implements AgentAdapter {
         },
         body: JSON.stringify({ context: wrapGrokBotWake(prompt) }),
         signal: ac.signal,
+        redirect: "error",
       });
     } catch (err) {
       throw toUnreachable(err);

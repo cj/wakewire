@@ -58,6 +58,7 @@ describe("GrokBotAdapter", () => {
     expect(calls).toHaveLength(1);
     expect(calls[0]?.url).toBe("https://api2.cursor.sh/automations/webhook/abc");
     expect(calls[0]?.init.method).toBe("POST");
+    expect(calls[0]?.init.redirect).toBe("error");
     const headers = new Headers(calls[0]?.init.headers);
     expect(headers.get("authorization")).toBe("Bearer crsr_secret");
     expect(headers.get("content-type")).toBe("application/json");
@@ -68,6 +69,25 @@ describe("GrokBotAdapter", () => {
     expect(body.context).not.toMatch(/xoxb-/);
     expect(body.context).not.toContain("smee.io");
     expect(body.context).not.toContain("crsr_secret");
+  });
+
+  it("throws PermanentError for a non-https webhook and does not fetch", async () => {
+    const calls: unknown[] = [];
+    const adapter = new GrokBotAdapter(logger, {
+      lookupAgent: () => ({
+        webhookUrl: "http://evil.test/hook",
+        senderKey: "crsr_secret",
+      }),
+      hasConfiguredAgent: () => true,
+      fetch: async () => {
+        calls.push("fetched");
+        throw new Error("should not fetch");
+      },
+    });
+    await expect(adapter.deliverToThread("oncall", "hi", opts)).rejects.toBeInstanceOf(
+      PermanentError,
+    );
+    expect(calls).toEqual([]);
   });
 
   it("throws PermanentError for an unknown specialist", async () => {

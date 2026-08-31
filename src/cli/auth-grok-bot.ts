@@ -32,7 +32,7 @@ export async function authGrokBot(
 
   const webhookUrl = opts.webhookUrl ?? (await promptVisible("Grok Bot routine webhook URL: "));
   if (!isHttpUrl(webhookUrl)) {
-    console.error("webhook URL must be an http(s) URL");
+    console.error("webhook URL must be an https URL");
     process.exitCode = 1;
     return;
   }
@@ -72,7 +72,7 @@ async function promptVisible(question: string): Promise<string> {
 function isHttpUrl(value: string): boolean {
   try {
     const url = new URL(value);
-    return url.protocol === "https:" || url.protocol === "http:";
+    return url.protocol === "https:";
   } catch {
     return false;
   }

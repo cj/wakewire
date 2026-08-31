@@ -76,7 +76,7 @@ describe("POST /api/slack/post", () => {
     const res = await app.request("/api/slack/post", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ sourceId: "slack-default", channel: "C1", text: "hi" }),
+      body: JSON.stringify({ sourceId: "slack-default", channel: "C01234567", text: "hi" }),
     });
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({ error: "unauthorized" });
@@ -90,7 +90,7 @@ describe("POST /api/slack/post", () => {
         authorization: "Bearer wrong-token",
         "content-type": "application/json",
       },
-      body: JSON.stringify({ sourceId: "slack-default", channel: "C1", text: "hi" }),
+      body: JSON.stringify({ sourceId: "slack-default", channel: "C01234567", text: "hi" }),
     });
     expect(res.status).toBe(401);
   });
@@ -117,17 +117,17 @@ describe("POST /api/slack/post", () => {
       },
       body: JSON.stringify({
         sourceId: "slack-default",
-        channel: "C456",
+        channel: "C01234567",
         text: "shipped",
         thread_ts: "1.234",
       }),
     });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, channel: "C456", ts: "9.001" });
+    expect(await res.json()).toEqual({ ok: true, channel: "C01234567", ts: "9.001" });
     expect(posts).toEqual([
       {
         botToken: "xoxb-test",
-        channel: "C456",
+        channel: "C01234567",
         text: "shipped",
         threadTs: "1.234",
       },
@@ -149,7 +149,62 @@ describe("POST /api/slack/post", () => {
         authorization: `Bearer ${TOKEN}`,
         "content-type": "application/json",
       },
-      body: JSON.stringify({ sourceId: "slack-default", channel: "C1", text: "hi" }),
+      body: JSON.stringify({ sourceId: "slack-default", channel: "C01234567", text: "hi" }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("400s DMs and other non-channel conversation ids", async () => {
+    const posts: unknown[] = [];
+    const { app, stores, secrets } = makeApp({
+      slackPoster: async (input) => {
+        posts.push(input);
+        return { channel: input.channel, ts: "1.0" };
+      },
+    });
+    stores.sources.upsert({
+      id: "slack-default",
+      kind: "slack",
+      config: { team: "default" },
+    });
+    secrets.set(secretNames.slackBotToken("slack-default"), "xoxb-test");
+    const headers = {
+      authorization: `Bearer ${TOKEN}`,
+      "content-type": "application/json",
+    };
+    for (const channel of ["D01234567", "U01234567", "C1", "#general"]) {
+      const res = await app.request("/api/slack/post", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ sourceId: "slack-default", channel, text: "hi" }),
+      });
+      expect(res.status).toBe(400);
+    }
+    expect(posts).toEqual([]);
+  });
+
+  it("400s a malformed thread_ts", async () => {
+    const { app, stores, secrets } = makeApp({
+      slackPoster: async () => ({ channel: "C01234567", ts: "1.0" }),
+    });
+    stores.sources.upsert({
+      id: "slack-default",
+      kind: "slack",
+      config: { team: "default" },
+    });
+    secrets.set(secretNames.slackBotToken("slack-default"), "xoxb-test");
+    const res = await app.request("/api/slack/post", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${TOKEN}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        sourceId: "slack-default",
+        channel: "C01234567",
+        text: "hi",
+        thread_ts: "not-a-ts",
+      }),
     });
     expect(res.status).toBe(400);
   });
@@ -165,7 +220,7 @@ describe("POST /api/slack/post", () => {
         authorization: `Bearer ${TOKEN}`,
         "content-type": "application/json",
       },
-      body: JSON.stringify({ sourceId: "nope", channel: "C1", text: "hi" }),
+      body: JSON.stringify({ sourceId: "nope", channel: "C01234567", text: "hi" }),
     });
     expect(missing.status).toBe(404);
     const wrongKind = await app.request("/api/slack/post", {
@@ -174,7 +229,7 @@ describe("POST /api/slack/post", () => {
         authorization: `Bearer ${TOKEN}`,
         "content-type": "application/json",
       },
-      body: JSON.stringify({ sourceId: "github-acme", channel: "C1", text: "hi" }),
+      body: JSON.stringify({ sourceId: "github-acme", channel: "C01234567", text: "hi" }),
     });
     expect(wrongKind.status).toBe(404);
   });
