@@ -442,7 +442,7 @@ export function createApi(ctx: ApiContext): Hono {
     const parsed = z
       .object({
         sourceId: z.string().min(1),
-        channel: z.string().regex(/^[CG][A-Z0-9]{8,}$/),
+        channel: z.string().regex(/^[CGD][A-Z0-9]{8,}$/),
         text: z.string().min(1).max(40000),
         thread_ts: z
           .string()

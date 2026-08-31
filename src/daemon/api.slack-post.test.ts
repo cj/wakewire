@@ -154,7 +154,44 @@ describe("POST /api/slack/post", () => {
     expect(res.status).toBe(400);
   });
 
-  it("400s DMs and other non-channel conversation ids", async () => {
+  it("posts to DM conversation ids", async () => {
+    const posts: unknown[] = [];
+    const { app, stores, secrets } = makeApp({
+      slackPoster: async (input) => {
+        posts.push(input);
+        return { channel: input.channel, ts: "9.002" };
+      },
+    });
+    stores.sources.upsert({
+      id: "slack-default",
+      kind: "slack",
+      config: { team: "default" },
+    });
+    secrets.set(secretNames.slackBotToken("slack-default"), "xoxb-test");
+    const res = await app.request("/api/slack/post", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${TOKEN}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        sourceId: "slack-default",
+        channel: "D01234567",
+        text: "hi",
+      }),
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, channel: "D01234567", ts: "9.002" });
+    expect(posts).toEqual([
+      {
+        botToken: "xoxb-test",
+        channel: "D01234567",
+        text: "hi",
+      },
+    ]);
+  });
+
+  it("400s user ids and other non-conversation ids", async () => {
     const posts: unknown[] = [];
     const { app, stores, secrets } = makeApp({
       slackPoster: async (input) => {
@@ -172,7 +209,7 @@ describe("POST /api/slack/post", () => {
       authorization: `Bearer ${TOKEN}`,
       "content-type": "application/json",
     };
-    for (const channel of ["D01234567", "U01234567", "C1", "#general"]) {
+    for (const channel of ["U01234567", "C1", "#general"]) {
       const res = await app.request("/api/slack/post", {
         method: "POST",
         headers,
