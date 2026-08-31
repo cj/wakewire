@@ -4,6 +4,7 @@ import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { Command } from "commander";
 import { authGmail } from "./cli/auth-gmail.js";
+import { authGrokBot } from "./cli/auth-grok-bot.js";
 import { authImap } from "./cli/auth-imap.js";
 import { authSlack } from "./cli/auth-slack.js";
 import { authWebhook } from "./cli/auth-webhook.js";
@@ -147,6 +148,25 @@ auth
   .action(async (opts: { source?: string; appToken?: string; botToken?: string }) => {
     await authSlack(createLogger(), opts);
   });
+auth
+  .command("grok-bot")
+  .description(
+    "Store a Grok Bot routine webhook URL + sender key for one specialist (route target.threadId)",
+  )
+  .requiredOption("--thread <id>", "specialist id (the route target.threadId)")
+  .option("--webhook-url <url>", "routine webhook URL (prefer the prompt)")
+  .option("--sender-key <key>", "sender key / Bearer token (prefer the hidden prompt)")
+  .option("--as-default", "also set sink.grokBotDefaultAgent to this specialist")
+  .action(
+    async (opts: {
+      thread?: string;
+      webhookUrl?: string;
+      senderKey?: string;
+      asDefault?: boolean;
+    }) => {
+      await authGrokBot(createLogger(), opts);
+    },
+  );
 auth
   .command("webhook")
   .description("Store a provider-issued signing secret for a generic webhook source")

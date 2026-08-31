@@ -187,9 +187,10 @@ Socket Mode — an outbound WebSocket, no public URL.
 **2. Build the Slack app** (the setup tool returns these steps verbatim): create
 an app at <https://api.slack.com/apps>, enable Socket Mode and generate an
 **app-level token** (`xapp-…`, scope `connections:write`), add bot scopes
-(`app_mentions:read`, `channels:history`, `channels:read`, `users:read`),
-subscribe to bot events (`app_mention`, `message.channels`), install to the
-workspace and copy the **bot token** (`xoxb-…`), and `/invite` the bot to the
+(`app_mentions:read`, `channels:history`, `channels:read`, `users:read`,
+`chat:write`; add `chat:write.public` to post in public channels the bot has not
+joined), subscribe to bot events (`app_mention`, `message.channels`), install to
+the workspace and copy the **bot token** (`xoxb-…`), and `/invite` the bot to the
 channels it should read.
 
 > **⚠️ Reinstall after every scopes/events change.** If you add event
@@ -229,6 +230,47 @@ showing as raw ids (`#C0B4…`) means the `channels:read` scope is missing
 
 Give the agent's Slack MCP server read-only scopes (no `chat:write`) so a
 prompt-injected message can at worst mislead a draft you review.
+
+### Grok Bot specialists (webhook wake + localhost Slack reply)
+
+Use this when the sink is a Grok Bot agent rather than Codex. Socket Mode is
+still inbound-only. There is **no** public smee/tunnel reply URL and **no**
+`/ingress/slack-reply`. The specialist replies by curling WakeWire on loopback.
+
+```bash
+wakewire config set sink.adapter grok-bot
+# Copy the routine webhook URL + sender key from the Grok Bot desktop app
+# (trigger card on the specialist's "When a webhook fires" routine).
+wakewire auth grok-bot --thread oncall
+wakewire stop && wakewire start --detach
+```
+
+`--thread oncall` is the specialist id. Routes target it with
+`{"type":"thread","threadId":"oncall"}`. Optional: `wakewire auth grok-bot --thread oncall --as-default`
+so `new-thread` routes have somewhere to go; otherwise `startThread` is a
+permanent error (specialists are addressed by id, not spawned).
+
+Inbound path: Slack Socket Mode / GitHub → daemon → grok-bot adapter POSTs that
+specialist's webhook (`Authorization: Bearer <sender key>`, body `{context}`) and
+resolves on 2xx. It does **not** wait for the agent to finish.
+
+The wake carries Slack `sourceId`, `channel`, `ts`, and `threadTs` (and the
+source delivery id). It tells the specialist to post via the Mac localhost API.
+It does **not** include the `xoxb-` token or a smee reply URL. The daemon bearer
+is read from `~/.wakewire/daemon.json` (`port` + `token`) on the Mac.
+
+Outbound path (production, not a test extra). On the Mac, read `port` and `token`
+from `~/.wakewire/daemon.json` (do not log the token) and:
+
+```bash
+curl -sS -X POST "http://127.0.0.1:<port>/api/slack/post" \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"sourceId":"slack-default","channel":"C123","text":"done","thread_ts":"123.456"}'
+```
+
+The daemon uses the existing Slack `WebClient` + stored `slackBotToken` to call
+`chat.postMessage`. Never reply as @Cursor.
 
 ---
 

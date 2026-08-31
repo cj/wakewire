@@ -66,7 +66,9 @@ For Slack: Socket Mode — an outbound WebSocket, no public URL, same spirit as 
 smee relay. Create a Slack app once (`wakewire_source_setup_slack` returns the
 exact steps), store the app + bot tokens with `wakewire auth slack`, and route
 `app_mention`s (any channel the bot is in) or `message`s (named channels only —
-watch-everything is rejected, and bot chatter is skipped by default).
+watch-everything is rejected, and bot chatter is skipped by default). Replies
+go out over loopback `POST /api/slack/post` (daemon bearer from `~/.wakewire/daemon.json`);
+the bot token never leaves the Mac, and there is no public reply URL.
 
 **Any other provider** works through the generic webhook source
 (`wakewire_source_setup_webhook`): pick a verification preset (HMAC-SHA256 header
@@ -153,6 +155,11 @@ WakeWire talks to Codex through an adapter (config: settings key `sink.adapter`)
   `wakewire config set sink.adapter codex-sdk` (then restart the daemon).
 - **`codex-exec`** — plain `codex exec` shell-out against your installed codex;
   maximum-compatibility last resort.
+- **`grok-bot`** — fire-and-forget POST to a Grok Bot routine webhook (one URL +
+  sender key per specialist; `target.threadId` selects the specialist). The wake
+  is accepted when the webhook returns 2xx; wakewire does not wait for the agent
+  to finish. Slack replies are posted by the specialist curling localhost
+  `/api/slack/post`. Store credentials with `wakewire auth grok-bot --thread <id>`.
 
 Honest caveats: cross-client thread attachment is not officially documented by
 OpenAI; with the default SDK adapter, an open thread in the desktop app won't

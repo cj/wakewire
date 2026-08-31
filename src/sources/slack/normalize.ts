@@ -17,8 +17,10 @@ export function slackToWakeEvent(args: {
   eventId: string;
   teamId: string | undefined;
   names: SlackNames;
+  /** WakeWire source id (slack-<team>) so specialists can POST /api/slack/post. */
+  sourceId: string;
 }): WakeEvent | null {
-  const { event, eventId, teamId, names } = args;
+  const { event, eventId, teamId, names, sourceId } = args;
   const type = str(event.type);
   if (!type) return null;
   const subtype = str(event.subtype);
@@ -32,13 +34,17 @@ export function slackToWakeEvent(args: {
   // userName/channelName are ALWAYS present (falling back to the raw ids):
   // the default prompt template interpolates them, and a missing whitelisted
   // field is a hard template error that would fail every delivery.
+  const itemTs = str((event.item as Record<string, unknown> | undefined)?.ts);
+  const threadTs = str(event.thread_ts) || str(event.ts) || itemTs;
   const base = {
+    sourceId,
     channel,
     channelName: channelLabel,
     user,
     userName: userLabel,
     eventType: kind,
     ...(teamId ? { team: teamId } : {}),
+    ...(threadTs ? { threadTs } : {}),
   };
 
   if (type === "reaction_added" || type === "reaction_removed") {
@@ -49,7 +55,7 @@ export function slackToWakeEvent(args: {
       deliveryId: eventId,
       occurredAt,
       summary: `@${userLabel} ${type === "reaction_added" ? "reacted" : "unreacted"} :${reaction}: in #${channelLabel}`,
-      payload: { ...base, reaction, itemTs: str((event.item as Record<string, unknown>)?.ts) },
+      payload: { ...base, reaction, ...(itemTs ? { itemTs } : {}) },
     };
   }
 
@@ -69,7 +75,6 @@ export function slackToWakeEvent(args: {
       ...base,
       text,
       ts: str(event.ts),
-      ...(str(event.thread_ts) ? { threadTs: str(event.thread_ts) } : {}),
     },
   };
 }

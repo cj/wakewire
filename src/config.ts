@@ -2,7 +2,12 @@ import crypto from "node:crypto";
 import { z } from "zod";
 import type { SettingsStore } from "./db/repos.js";
 
-export const AdapterNameSchema = z.enum(["codex-sdk", "codex-app-server", "codex-exec"]);
+export const AdapterNameSchema = z.enum([
+  "codex-sdk",
+  "codex-app-server",
+  "codex-exec",
+  "grok-bot",
+]);
 export type AdapterName = z.infer<typeof AdapterNameSchema>;
 
 export interface DaemonConfig {
@@ -16,6 +21,11 @@ export interface DaemonConfig {
   /** 0 = pick a random free port and record it in the state file. */
   apiPort: number;
   apiToken: string;
+  /**
+   * grok-bot only: specialist id used by startThread / new-thread routes.
+   * Thread-targeted routes still address a specialist by target.threadId.
+   */
+  grokBotDefaultAgent: string | undefined;
 }
 
 export const settingKeys = {
@@ -27,6 +37,7 @@ export const settingKeys = {
   ratePerMinute: "queue.ratePerMinute",
   apiPort: "api.port",
   apiToken: "api.token",
+  grokBotDefaultAgent: "sink.grokBotDefaultAgent",
 } as const;
 
 export function loadConfig(settings: SettingsStore): DaemonConfig {
@@ -50,5 +61,6 @@ export function loadConfig(settings: SettingsStore): DaemonConfig {
     apiToken: settings.getOrCreate(settingKeys.apiToken, () =>
       crypto.randomBytes(32).toString("hex"),
     ),
+    grokBotDefaultAgent: settings.get(settingKeys.grokBotDefaultAgent) || undefined,
   };
 }

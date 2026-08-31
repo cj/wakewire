@@ -14,8 +14,8 @@ export interface DeliveryResult {
 }
 
 /**
- * The one seam between wakewire and any coding agent. v1 ships Codex
- * implementations only; a Claude Code adapter would implement this interface.
+ * The one seam between wakewire and any coding agent. Codex adapters and the
+ * grok-bot webhook adapter implement this; a Claude Code adapter would too.
  */
 export interface AgentAdapter {
   readonly name: string;

@@ -55,5 +55,5 @@ the manual smoke test below. Run it before cutting a release.
 ## Style
 
 Biome-formatted, strict TypeScript, ESM. Keep the AgentAdapter seam clean: nothing
-outside `src/sinks/` may know how turns reach Codex. Sources own payload trimming;
+outside `src/sinks/` may know how turns reach the agent. Sources own payload trimming;
 nothing downstream of a source may see raw provider payloads.

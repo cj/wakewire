@@ -38,7 +38,7 @@ export class Daemon {
     const stores = createStores(this.db);
     const config = loadConfig(stores.settings);
     const secrets = await createSecretStore(this.logger);
-    const adapter = createAdapter(config, this.logger);
+    const adapter = createAdapter(config, this.logger, secrets);
     this.adapter = adapter;
 
     const queue = new DeliveryQueue(stores, adapter, this.logger, {

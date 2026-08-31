@@ -184,6 +184,26 @@ skills, mcp, config-reference).
     codex-sdk`). `sink.appServerListen` stays opt-in: on by default would open
     an unauthenticated loopback codex control plane without consent.
 
+18. **Grok Bot adapter + loopback Slack post (added 2026-08-31).** Codex remains
+    the default sink. `grok-bot` is an `AgentAdapter` that POSTs the rendered
+    wake to a per-specialist Grok Bot routine webhook (`Authorization: Bearer
+    <sender key>`, JSON `{context}`) and treats HTTP 2xx as delivery — fire and
+    forget; the queue does not wait for the agent to finish. `threadId` is the
+    specialist id. Unknown specialist / 401/403/404 → `PermanentError`;
+    transport/5xx → `UnreachableError`. `startThread` is a `PermanentError`
+    unless `sink.grokBotDefaultAgent` is set, because specialists are not
+    spawned. Webhook URL + sender key live in the secret store (never logged);
+    `wakewire auth grok-bot --thread <id>` stores them.
+
+    Slack replies do **not** use a public smee/tunnel URL or `/ingress/slack-reply`.
+    Socket Mode stays inbound-only. The production outbound path is loopback
+    `POST /api/slack/post` (daemon bearer from `~/.wakewire/daemon.json`) which
+    calls `chat.postMessage` with the bot token from the secret store. The wake
+    carries `sourceId` / `channel` / `threadTs` and instructs the specialist to
+    curl that endpoint; it never includes `xoxb-` or a reply-smee URL. The bot
+    token never leaves the Mac. `chat:write` (and optionally `chat:write.public`)
+    was added to Slack setup instructions.
+
 ## Deliberately deferred
 
 ### GitHub IP allowlist on listen-mode ingress (backlog, 2026-07-05)
